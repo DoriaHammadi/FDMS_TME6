@@ -41,7 +41,7 @@ class ValueIteration(object):
                 break 
                 
         #### Meilleur Politique ####
-         ### comment gerer les valuer qui sont pas dans p.keys()
+         ### states qui sont pas dans p.keys() !!!
         for s in self.states :
             if s in self.p.keys():
                 act_s = { a : sum ([dest[0] * (dest[2] + gamma * self.value_new[self.states[dest[1]]])
