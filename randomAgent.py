@@ -43,24 +43,27 @@ if __name__ == '__main__':
     env.seed(0)
 
 
-    episode_count = 1000000
+    episode_count = 12
     reward = 0
     done = False
     envx.verbose = True
 
-    envx.setPlan("gridworldPlans/plan0.txt",{0:-0.001,3:1,4:1,5:-1,6:-1})
+    envx.setPlan("gridworldPlans/plan2.txt",{0:-0.001,3:1,4:1,5:-1,6:-1})
 
     agent = RandomAgent(envx.action_space)
     #np.random.seed(5)
     rsum=0
 
+    results = []
+
     for i in range(episode_count):
         ob = env.reset()
 
-        if i % 100 == 0 and i > 0:
+        envx.verbose = False
+        '''if i % 100 == 0 and i > 0:
             envx.verbose = True
         else:
-            envx.verbose = False
+            envx.verbose = False'''
 
         if envx.verbose:
             envx.render(1)
@@ -75,10 +78,11 @@ if __name__ == '__main__':
             if envx.verbose:
                 envx.render()
             if done:
-                print(ob)
+                results.append(rsum)
                 print(str(i)+" rsum="+str(rsum)+", "+str(j)+" actions")
                 rsum=0
                 break
 
+    print(np.mean(results))
     print("done")
     env.close()
