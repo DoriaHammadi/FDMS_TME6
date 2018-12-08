@@ -1,6 +1,7 @@
 import argparse
 import sys
 import matplotlib
+import pandas as pd
 import matplotlib.pyplot as plt
 matplotlib.use("TkAgg")
 import gym
@@ -9,17 +10,50 @@ import envs
 from gym import wrappers, logger
 import numpy as np
 import copy
-import pandas as pd
+import random
 
-class RandomAgent(object):
+class Q_learning(object):
     """The world's simplest agent!"""
-    def __init__(self, action_space):
-        self.action_space = action_space
-        print(self.action_space)
+    def __init__(self, env, alpha, gamma): 
+        self.env = env 
+        self.Q = dict()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def explore(self, iter):
+
+        for it in range(iter):
+
+            #Initialisation
+            ob = env.reset()
+            ob_key = ob.dumps()
+            if (ob_key,0) not in self.Q.keys():
+                for i in range(0,4):
+                    self.Q[(ob_key, i)] = 0
+
+            #Apprentissage
+            while True :
+                a = random.sample(self.env.actions.keys(), 1)[0]
+                ob_new, reward, done, _ = env.step(a)
+                ob_new_key = ob_new.dumps()
+                if (ob_new_key,0) not in self.Q.keys():
+                    for i in range(0, 4):
+                        self.Q[(ob_new_key, i)] = 0
+
+                self.Q[(ob_key,a)] = self.Q[(ob_key,a)] + self.alpha * (reward + self.gamma * np.max([self.Q[(ob_new_key,a_new)] for a_new in range(0,4)]) -
+                                                                self.Q[(ob_key, a)])
+
+                ob = ob_new
+                ob_key = ob_new_key
+
+                if (done == True):
+                    break
+        print(self.Q.values())
 
     def act(self, observation, reward, done):
-        f = 2#self.action_space.sample()
-        return f
+        ob = observation.dumps()
+        return np.argmax([self.Q[(ob,a)] for a in range(0,4)])
+                
 
 
 if __name__ == '__main__':
@@ -33,11 +67,19 @@ if __name__ == '__main__':
 
     envx = gym.make(args.env_id)
 
-    outdir = 'gridworld-v0/random-agent-results'
+    outdir = 'gridworld-v0/policy-iteration-results'
 
     env = wrappers.Monitor(envx, directory=outdir, force=True, video_callable=False)
 
     env.seed(0)
+
+    num = 0
+    gamma = 0.5
+    eps = 0.001
+
+    lnum = [0]
+    lgamma = [i/10 for i in range(1,10)]
+    leps = [0.01,0.001,0.0001]
 
     episode_count = 1000
     reward = 0
@@ -45,11 +87,13 @@ if __name__ == '__main__':
     envx.verbose = False
     tot_moves = []
     tot_score = []
-    for num in range(0, 1):
+    for num in lnum:
         if num != 9:
             envx.setPlan("gridworldPlans/plan" + str(num) + ".txt", {0: -0.001, 3: 1, 4: 1, 5: -1, 6: -1})
 
-            agent = RandomAgent(envx)
+            agent = Q_learning(envx, 0.0001, 0.1)
+            agent.explore(20)
+
             # np.random.seed(5)
             rsum = 0
             results = []
@@ -94,7 +138,8 @@ if __name__ == '__main__':
 
     env.close()
     dataframe = pd.DataFrame([tot_moves, tot_score], index=['movement', 'score'],
-                             columns=[0, 1, 2, 3, 4, 5, 6, 7, 8, 10])
-    writer = pd.ExcelWriter('randomAgent'+str(episode_count) + '.xlsx')
+                             columns=lnum)
+    writer = pd.ExcelWriter('policyIteration' + str(episode_count) + '.xlsx')
     dataframe.to_excel(writer, 'Sheet2')
     writer.save()
+

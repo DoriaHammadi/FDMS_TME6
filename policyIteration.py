@@ -9,7 +9,8 @@ Created on Mon Nov 26 16:33:37 2018
 import argparse
 import sys
 import matplotlib
-
+import pandas as pd
+import matplotlib.pyplot as plt
 matplotlib.use("TkAgg")
 import gym
 import envs
@@ -22,7 +23,7 @@ import copy
 class PolicyIteration(object):
     """The world's simplest agent!"""
 
-    def __init__(self, env, gamma, eps=0.8):
+    def __init__(self, env, gamma, eps= 0.001):
 
         self.env = env
         self.states, self.p = env.getMDP()
@@ -68,6 +69,7 @@ class PolicyIteration(object):
         return self.pi[state]
 
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('env_id', nargs='?', default='gridworld-v0', help='Select the environment to run')
@@ -79,52 +81,76 @@ if __name__ == '__main__':
 
     envx = gym.make(args.env_id)
 
-    outdir = 'gridworld-v0/value-iteration-results'
+    outdir = 'gridworld-v0/policy-iteration-results'
 
     env = wrappers.Monitor(envx, directory=outdir, force=True, video_callable=False)
 
     env.seed(0)
 
-    episode_count = 12
+    num = 0
+    gamma = 0.5
+    eps = 0.001
+
+    lnum = [0]
+    lgamma = [i/10 for i in range(1,10)]
+    leps = [0.01,0.001,0.0001]
+
+    episode_count = 1000
     reward = 0
     done = False
-    envx.verbose = True
+    envx.verbose = False
+    tot_moves = []
+    tot_score = []
+    for num in lnum:
+        if num != 9:
+            envx.setPlan("gridworldPlans/plan" + str(num) + ".txt", {0: -0.001, 3: 1, 4: 1, 5: -1, 6: -1})
 
-    envx.setPlan("gridworldPlans/plan2.txt", {0: -0.001, 3: 1, 4: 1, 5: -1, 6: -1})
+            agent = PolicyIteration(envx, gamma,eps)
+            # np.random.seed(5)
+            rsum = 0
+            results = []
+            moves = []
+            for i in range(episode_count):
+                ob = env.reset()
 
-    agent = PolicyIteration(envx, 0.5)
-    # np.random.seed(5)
-    rsum = 0
-    results = []
-    for i in range(episode_count):
-        ob = env.reset()
+                '''if i % 100 == 0 and i > 0:
+                    envx.verbose = True
+                else:
+                    envx.verbose = False'''
 
-        envx.verbose = False
-        '''if i % 100 == 0 and i > 0:
-            envx.verbose = True
-        else:
-            envx.verbose = False'''
+                if envx.verbose:
+                    envx.render(1)
+                j = 0
 
-        if envx.verbose:
-            envx.render(1)
-        j = 0
-        # print(str(ob))
-        while True:
-            # print(agent.states[ob.dumps()])
-            # print(agent.p[ob.dumps()])
-            # print(ob)
-            # sprint(ob)
-            action = agent.act(ob, reward, done)
-            ob, reward, done, _ = env.step(action)
-            rsum += reward
-            j += 1
-            if envx.verbose:
-                envx.render()
-            if done:
-                results.append(rsum)
-                print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions")
-                rsum = 0
-                break
-    print(np.mean(results))
-    print("done")
+                # print(str(ob))
+                while True:
+                    # sprint(ob)
+                    action = agent.act(ob, reward, done)
+                    ob, reward, done, _ = env.step(action)
+                    # print(done)
+                    rsum += reward
+                    j += 1
+                    if envx.verbose:
+                        envx.render()
+                    if done:
+                        results.append(rsum)
+                        moves.append(j)
+                        # print(str(i)+" rsum="+str(rsum)+", "+str(j)+" actions")
+                        rsum = 0
+                        break
+            print('score: ' + str(np.mean(results)))
+            print('moves: ' + str(np.mean(moves)))
+            plt.hist(results)
+            plt.show()
+            plt.hist(moves)
+            plt.show()
+            tot_score.append(np.mean(results))
+            tot_moves.append(np.mean(moves))
+            print("done")
+
     env.close()
+    dataframe = pd.DataFrame([tot_moves, tot_score], index=['movement', 'score'],
+                             columns=lnum)
+    writer = pd.ExcelWriter('policyIteration' + str(episode_count) + '.xlsx')
+    dataframe.to_excel(writer, 'Sheet2')
+    writer.save()
