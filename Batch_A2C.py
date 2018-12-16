@@ -19,9 +19,11 @@ def transformer(size):
 
 class ActorCritic(object):
     """The world's simplest agent!"""
-    def __init__(self, env, inSize, outSize,layers,gamma, lrPi, lrV ):
+    def __init__(self, env, inSize, outSize,layers
+                 , gamma, lrPi, lrV ):
         self.inSize = inSize
         self.outSize = outSize
+        #self.patch_size = patch_size
         self.pi = Pi(inSize, outSize, layers)
         self.V = V(inSize, outSize, layers)
         self.gamma = gamma
@@ -36,18 +38,17 @@ class ActorCritic(object):
         #Trouve l'action
         self.s = torch.FloatTensor(observation)
         self.prob_a = self.pi.forward(self.s)
-
+        print("########", self.prob_a)
+        
         self.a = torch.distributions.Categorical(self.prob_a).sample()
         return self.a.tolist()
     
     def learn(self, ob, reward, done):
-        
+        print(ob)
         s = torch.FloatTensor(self.s)
         
         a = self.a
         s1 = torch.FloatTensor(ob)
- 
-        #Met à jour V
         value = self.V.forward(s1)
         y1 = Variable(reward + self.gamma * self.V.forward(s1).detach(), requires_grad = False)
         
@@ -56,9 +57,7 @@ class ActorCritic(object):
         self.optim_V.zero_grad()
         loss_V.backward()
         self.optim_V.step()
-         
-        #Met à jour Pi
-    
+      
         A = float(reward) + self.gamma*self.V.forward(s1)[a].detach() - self.V.forward(s)[a].detach()        
         A = A.detach()
         
@@ -117,7 +116,7 @@ if __name__ == '__main__':
         agent = ActorCritic(env, inSize, outSize,layers,gamma, lrPi, lrV)
         #np.random.seed(5)
         rsum=0
-
+        obs = []
         for i in range(episode_count):
             ob = env.reset()
 
@@ -134,7 +133,7 @@ if __name__ == '__main__':
 
                 action = agent.act(ob, reward, done)
                 ob, reward, done, _ = env.step(action)
-                agent.learn(ob, reward, done)
+                obs.appends(ob)
                 rsum+=reward
                 j += 1
                 if envx.verbose:
@@ -142,6 +141,8 @@ if __name__ == '__main__':
                 if done:
                     print(str(i)+" rsum="+str(rsum)+", "+str(j)+" actions")
                     rsum=0
+                    agent.learn(obs, reward, done)
+                    obs  = []
                     break
 
         print("done")
@@ -268,6 +269,7 @@ if __name__ == '__main__':
         np.random.seed(5)
         rsum = 0
 
+        obs = []
         for i in range(episode_count):
             ob = env.reset()
             if i % 1 == 0 and i >= 0:
@@ -294,7 +296,7 @@ if __name__ == '__main__':
                 j += 1
                 
                 ob, reward, done, _ = env.step(action)
-                agent.learn(ob, reward, done)
+                #obs.append((ob, action))
                 
                 # if done:
                 #    prs("rsum before",rsum)
@@ -308,6 +310,7 @@ if __name__ == '__main__':
 
 
                     print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")
+                    agent.learn(ob, reward, done)
 
                     rsum = 0
                     break

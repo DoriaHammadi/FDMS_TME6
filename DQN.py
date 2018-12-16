@@ -79,10 +79,8 @@ class DQN(object):
             et apprednre sur ce batch
         '''
         if(self.memory_counter < self.MEMORY_CAPACITY):
-            print("In return")
             return
         self.steps_learn += 1   
-        # sample batch transitions
         sample_index = np.random.choice(self.MEMORY_CAPACITY, self.BATCH_SIZE)
         b_memory = self.memory[sample_index, :]
         b_s = torch.FloatTensor(b_memory[:, :self.N_STATES])
@@ -91,24 +89,20 @@ class DQN(object):
         mean_reward = b_r.mean()
         b_s_ = torch.FloatTensor(b_memory[:, -self.N_STATES:])
 
-        # q_eval w.r.t the action in experience
         q_eval = self.eval_net(b_s).gather(1, b_a) 
         q_ = self.eval_net(b_s)# shape (batch, 1)
         q_next = self.target_net(b_s_).detach()    
-        
-        
+                
         q_target = b_r + self.GAMMA * q_next.max(1)[0].view(self.BATCH_SIZE, 1)   # shape (batch, 1)
         loss = self.loss_func(q_eval, q_target)
         loss_list.append(loss)
-
         
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         if (self.steps_learn % 100 == 0):
             q_next = q_eval
-        print("epoch: %d loss: %.3f reward_mean %.1f" %(i , loss, mean_reward
-                                                       )) 
+        print("epoch: %d loss: %.3f reward_mean %.1f" %(i , loss, mean_reward)) 
         for param in self.eval_net.parameters():
                 param.grad.data.clamp_(-1, 1)
 
@@ -172,10 +166,8 @@ if __name__ == '__main__':
 
                 action = agent.act(s , i)
                 s1, reward, done, _ = env.step(action)
-                agent.store_transition(s, action, reward, s1)
-                
-                s = s1
-                
+                agent.store_transition(s, action, reward, s1)                
+                s = s1                
                 rsum+=reward
                 j += 1
                 agent.learn()
@@ -254,8 +246,6 @@ if __name__ == '__main__':
                 if envx.verbose:
                     env.render(1)
                 action = agent.act(s, i )
-                #print("fffffffffff",action )
-                #print("action "+str(action))
                 j += 1
                 s1, reward, done, _ = env.step(action)
                 agent.store_transition(s, action, reward, s1)
