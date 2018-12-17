@@ -4,7 +4,6 @@ import matplotlib
 matplotlib.use("TkAgg")
 import gym
 import envs
-#import gridworld_env
 from gym import wrappers, logger
 import numpy as np
 import copy
@@ -13,9 +12,9 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 from models_A2C import Pi,V
+import matplotlib.pyplot as plt
+import pandas as pd
 
-def transformer(size):
-    pass
 
 class ActorCritic(object):
     """The world's simplest agent!"""
@@ -67,10 +66,10 @@ class ActorCritic(object):
         self.optim_Pi.zero_grad()
         loss_Pi.backward()
         self.optim_Pi.step()
-        print("lossPI: %.3f, lossV: %.3f " %( loss_Pi, loss_V)) 
+       # print("lossPI: %.3f, lossV: %.3f " %( loss_Pi, loss_V)) 
 
 if __name__ == '__main__':
-
+    
     parser = argparse.ArgumentParser(description=None)
     #parser.add_argument('mode', nargs='?', default=1, help='Select the environment to run')
     parser.add_argument('--jeu', type=int, default=2
@@ -140,6 +139,7 @@ if __name__ == '__main__':
                 if envx.verbose:
                     envx.render()
                 if done:
+                    #
                     print(str(i)+" rsum="+str(rsum)+", "+str(j)+" actions")
                     rsum=0
                     break
@@ -172,7 +172,7 @@ if __name__ == '__main__':
         gamma = 0.99
         lrPi = 0.001
         lrV = 0.001
-        episode_count = 1000000
+        episode_count = 30000
         reward = 0
         done = False
         envx.verbose = True
@@ -258,7 +258,7 @@ if __name__ == '__main__':
         gamma = 0.99
         lrPi = 0.001
         lrV = 0.001
-        episode_count = 1000000
+        episode_count = 1000
         reward = 0
         done = False
         envx.verbose = True
@@ -267,28 +267,36 @@ if __name__ == '__main__':
 
         np.random.seed(5)
         rsum = 0
-
+        rsums = []
+        moves = []
+        
+        lnum = []
+        results = []
+        
+        
         for i in range(episode_count):
             ob = env.reset()
+            j = 0
+
             if i % 1 == 0 and i >= 0:
                 envx.verbose = True
                 # agent.restart=0.0
             else:
+                
                 envx.verbose = False
                 # agent.restart = restart
-                # ob=agent.restart()
+            # ob=agent.restart()
 
             #if i % 1 == 0:
             #    torch.save(agent, os.path.join(outdir, "mod_last"))
 
-            j = 0
             # agent.explo=explo
-            if envx.verbose:
-                envx.render()
+            #if envx.verbose:
+             #   envx.render()
             # print(str(ob))
             while True:
-                if envx.verbose:
-                    envx.render()
+              #  if envx.verbose:
+                    #envx.render()
                 action = agent.act(ob)
                 #print("action "+str(action))
                 j += 1
@@ -300,6 +308,7 @@ if __name__ == '__main__':
                 #    prs("rsum before",rsum)
                 #    prs("reward ",reward)
                 rsum += reward
+
                 # if done:
                 #    prs("rsum after",rsum)
                 # if not reward == 0:
@@ -308,14 +317,20 @@ if __name__ == '__main__':
 
 
                     print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")
-
+                    rsums.append(rsum)
+                    results.append(rsum)
+                    moves.append(j)
+                    lnum.append(i)
                     rsum = 0
                     break
 
-                # Note there's no env.render() here. But the environment still can open window and
-                # render if asked by env.monitor: it calls env.render('rgb_array') to record video.
-                # Video is not recorded every episode, see capped_cubic_video_schedule for details.
-
-        # Close the env and write monitor result info to disk
         print("done")
-        env.close()
+
+        dataframe = pd.DataFrame([results, moves], index=['movement', 'score'],
+                                 columns=lnum)
+        #writer = pd.DataFrame.to_csv('OnlineA2CCCCCCCCCCCCCC.xlsx')
+                                     
+        dataframe.to_csv('OnlineA2CCCCCCCCCCCCCC.csv', sep='\t')
+        #dataframe.to_excel(writer, 'Sheet2')
+        #
+        #writer.save()

@@ -4,7 +4,6 @@ import matplotlib
 matplotlib.use("TkAgg")
 import gym
 import envs
-#import gridworld_env
 from gym import wrappers, logger
 import numpy as np
 import copy
@@ -13,16 +12,15 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 from models_A2C import Pi,V
+import matplotlib.pyplot as plt
+import pandas as pd
 
-def transformer(size):
-    pass
 
 class ActorCritic(object):
     """The world's simplest agent!"""
-    def __init__(self, env, inSize, outSize,layersf, gamma, lrPi, lrV ):
+    def __init__(self, env, inSize, outSize,layers,gamma, lrPi, lrV ):
         self.inSize = inSize
         self.outSize = outSize
-        #self.patch_size = patch_size
         self.pi = Pi(inSize, outSize, layers)
         self.V = V(inSize, outSize, layers)
         self.gamma = gamma
@@ -31,44 +29,77 @@ class ActorCritic(object):
         self.loss_Pi = nn.CrossEntropyLoss()
         self.optim_V = torch.optim.Adam(self.V.parameters(), lr = lrV)
         self.optim_Pi = torch.optim.Adam(self.pi.parameters(), lr = lrPi)
+        self.memory_counter = 0  
+        
+        self.MEMORY_CAPACITY = 3000
+# for storing memory
+        self.memory = np.zeros((self.MEMORY_CAPACITY, inSize * 2 + 2))
         
     def act(self, observation):
         
         #Trouve l'action
         self.s = torch.FloatTensor(observation)
         self.prob_a = self.pi.forward(self.s)
-        print("########", self.prob_a)
-        
+
         self.a = torch.distributions.Categorical(self.prob_a).sample()
         return self.a.tolist()
-    
+
+    def store_transition(self, s, a, r, s_):
+        '''
+        enregister la transaction dans matrice memory
+        '''
+#print("########################save transaction")
+        transition = np.hstack((s, [a, r], s_))
+
+        index = self.memory_counter % self.MEMORY_CAPACITY
+        #print(transition)
+        self.memory[index, :] = transition
+        #print("memory ", self.memory[index, :])
+        
+        self.memory_counter += 1
     def learn(self, ob, reward, done):
-        print(ob)
-        s = torch.FloatTensor(self.s)
+        b_memory = self.memory
         
-        a = self.a
-        s1 = torch.FloatTensor(ob)
-        value = self.V.forward(s1)
-        y1 = Variable(reward + self.gamma * self.V.forward(s1).detach(), requires_grad = False)
         
-        y = self.V.forward(s)
+        self.memory_counyer = 0
+        self.memory = np.zeros((self.MEMORY_CAPACITY, inSize * 2 + 2))
+
+        b_s = torch.FloatTensor(b_memory[:, :self.inSize])
+        b_a = torch.LongTensor(b_memory[:, self.inSize:self.inSize+1].astype(int))
+        b_r = torch.FloatTensor(b_memory[:, self.inSize+1:self.inSize+2])
+        b_s1 = torch.FloatTensor(b_memory[:, -self.inSize:])
+
+ 
+        #Met à jour V
+        y1 = Variable(reward + self.gamma * self.V.forward(b_s1).detach(), requires_grad = False)
+        
+        y = self.V.forward(b_s)
         loss_V = self.loss_V(y, y1)
         self.optim_V.zero_grad()
         loss_V.backward()
+  
         self.optim_V.step()
-      
-        A = float(reward) + self.gamma*self.V.forward(s1)[a].detach() - self.V.forward(s)[a].detach()        
+         
+        #Met à jour Pi
+    
+        A = float(reward) + self.gamma*self.V.forward(b_s1)[b_a].detach() - self.V.forward(b_s)[b_a].detach() 
+        A = A.view(4, len(A)).type(torch.LongTensor)
         A = A.detach()
+        print("######################",A, (torch.log(self.pi.forward(b_s).view(len(b_s),self.outSize))
+                                                   ).shape)
+
+        loss_Pi = self.loss_Pi(torch.log(self.pi.forward(b_s).view(len(b_s),self.outSize)),
+                               
+                               b_a.view(-1) *(
+                               A))
         
-        loss_Pi = self.loss_Pi(torch.log(self.pi.forward(s).view(1,self.outSize)),
-                               torch.tensor([a])) * A
+        
         self.optim_Pi.zero_grad()
         loss_Pi.backward()
         self.optim_Pi.step()
-        print("lossPI: %.3f, lossV: %.3f " %( loss_Pi, loss_V)) 
 
 if __name__ == '__main__':
-
+    
     parser = argparse.ArgumentParser(description=None)
     #parser.add_argument('mode', nargs='?', default=1, help='Select the environment to run')
     parser.add_argument('--jeu', type=int, default=2
@@ -115,7 +146,7 @@ if __name__ == '__main__':
         agent = ActorCritic(env, inSize, outSize,layers,gamma, lrPi, lrV)
         #np.random.seed(5)
         rsum=0
-        obs = []
+
         for i in range(episode_count):
             ob = env.reset()
 
@@ -132,16 +163,20 @@ if __name__ == '__main__':
 
                 action = agent.act(ob, reward, done)
                 ob, reward, done, _ = env.step(action)
-                obs.appends(ob)
+                
+                agent.store_transition(s, action, reward, s1)                
+
                 rsum+=reward
                 j += 1
                 if envx.verbose:
                     envx.render()
                 if done:
+                    #
                     print(str(i)+" rsum="+str(rsum)+", "+str(j)+" actions")
+                    agent.learn(ob, reward, done)
+
                     rsum=0
-                    agent.learn(obs, reward, done)
-                    obs  = []
+                    
                     break
 
         print("done")
@@ -172,7 +207,7 @@ if __name__ == '__main__':
         gamma = 0.99
         lrPi = 0.001
         lrV = 0.001
-        episode_count = 1000000
+        episode_count = 30000
         reward = 0
         done = False
         envx.verbose = True
@@ -258,7 +293,7 @@ if __name__ == '__main__':
         gamma = 0.99
         lrPi = 0.001
         lrV = 0.001
-        episode_count = 1000000
+        episode_count = 1000
         reward = 0
         done = False
         envx.verbose = True
@@ -267,22 +302,29 @@ if __name__ == '__main__':
 
         np.random.seed(5)
         rsum = 0
-
-        obs = []
+        rsums = []
+        moves = []
+        
+        lnum = []
+        results = []
+        
+        
         for i in range(episode_count):
             ob = env.reset()
+            j = 0
+
             if i % 1 == 0 and i >= 0:
                 envx.verbose = True
                 # agent.restart=0.0
             else:
+                
                 envx.verbose = False
                 # agent.restart = restart
-                # ob=agent.restart()
+            # ob=agent.restart()
 
             #if i % 1 == 0:
             #    torch.save(agent, os.path.join(outdir, "mod_last"))
 
-            j = 0
             # agent.explo=explo
             if envx.verbose:
                 envx.render()
@@ -294,13 +336,13 @@ if __name__ == '__main__':
                 #print("action "+str(action))
                 j += 1
                 
-                ob, reward, done, _ = env.step(action)
-                #obs.append((ob, action))
-                
+                ob_, reward, done, _ = env.step(action)
+                agent.store_transition(ob, action, reward, ob_)
                 # if done:
                 #    prs("rsum before",rsum)
                 #    prs("reward ",reward)
                 rsum += reward
+
                 # if done:
                 #    prs("rsum after",rsum)
                 # if not reward == 0:
@@ -311,13 +353,20 @@ if __name__ == '__main__':
                     print(str(i) + " rsum=" + str(rsum) + ", " + str(j) + " actions ")
                     agent.learn(ob, reward, done)
 
+                    rsums.append(rsum)
+                    results.append(rsum)
+                    moves.append(j)
+                    lnum.append(i)
                     rsum = 0
                     break
 
-                # Note there's no env.render() here. But the environment still can open window and
-                # render if asked by env.monitor: it calls env.render('rgb_array') to record video.
-                # Video is not recorded every episode, see capped_cubic_video_schedule for details.
-
-        # Close the env and write monitor result info to disk
         print("done")
-        env.close()
+
+        dataframe = pd.DataFrame([results, moves], index=['movement', 'score'],
+                                 columns=lnum)
+        #writer = pd.DataFrame.to_csv('OnlineA2CCCCCCCCCCCCCC.xlsx')
+                                     
+        dataframe.to_csv('OnlineA2CTD0.csv', sep='\t')
+        #dataframe.to_excel(writer, 'Sheet2')
+        #
+        #writer.save()
