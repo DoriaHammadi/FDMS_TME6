@@ -46,7 +46,7 @@ class ActorCritic(object):
 
     def store_transition(self, s, a, r, s_):
         '''
-        enregister la transaction dans matrice memory
+        enregister la transaction dans la matrice memory
         '''
 #print("########################save transaction")
         transition = np.hstack((s, [a, r], s_))
@@ -58,14 +58,23 @@ class ActorCritic(object):
         
         self.memory_counter += 1
     def learn(self, ob, reward, done):
-        b_memory = self.memory
+        '''
+        mise a jour de V et Pi
+        '''
         
+        b_memory = self.memory[ :self.memory_counter, :]
         
-        self.memory_counyer = 0
+
+        self.memory_counter = 0
         self.memory = np.zeros((self.MEMORY_CAPACITY, inSize * 2 + 2))
 
         b_s = torch.FloatTensor(b_memory[:, :self.inSize])
         b_a = torch.LongTensor(b_memory[:, self.inSize:self.inSize+1].astype(int))
+        #y_onehot = torch.FloatTensor(len(b_a), self.outSize)
+        #y_onehot.zero_()
+        #b_a_onehot = y_onehot.scatter(1,b_a,1)
+        
+        
         b_r = torch.FloatTensor(b_memory[:, self.inSize+1:self.inSize+2])
         b_s1 = torch.FloatTensor(b_memory[:, -self.inSize:])
 
@@ -81,22 +90,17 @@ class ActorCritic(object):
         self.optim_V.step()
          
         #Met à jour Pi
-    
-        A = float(reward) + self.gamma*self.V.forward(b_s1)[b_a].detach() - self.V.forward(b_s)[b_a].detach() 
-        A = A.view(4, len(A)).type(torch.LongTensor)
+        A = float(reward) + self.gamma* (self.V.forward(b_s1)) - (self.V.forward(b_s)) 
         A = A.detach()
-        print("######################",A, (torch.log(self.pi.forward(b_s).view(len(b_s),self.outSize))
-                                                   ).shape)
-
-        loss_Pi = self.loss_Pi(torch.log(self.pi.forward(b_s).view(len(b_s),self.outSize)),
-                               
-                               b_a.view(-1) *(
-                               A))
-        
-        
+      
+        loss_Pi = self.loss_Pi(torch.log(self.pi.forward(b_s)) * A, b_a.view(-1))
+        print('***********', loss_Pi)
+        #loss_Pi = loss * (A)
+               
         self.optim_Pi.zero_grad()
         loss_Pi.backward()
         self.optim_Pi.step()
+        
 
 if __name__ == '__main__':
     

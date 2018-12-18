@@ -79,6 +79,7 @@ class DQN(object):
             et apprednre sur ce batch
         '''
         if(self.memory_counter < self.MEMORY_CAPACITY):
+            print("in return")
             return
         self.steps_learn += 1   
         sample_index = np.random.choice(self.MEMORY_CAPACITY, self.BATCH_SIZE)
@@ -204,7 +205,7 @@ if __name__ == '__main__':
         env = wrappers.Monitor(envx, directory=outdir, force=True, video_callable=False)
                      
         env.seed(0)
-        BATCH_SIZE = 1
+        BATCH_SIZE = 50
         LR = 0.01                   
         EPSILON = 0.9999              
         GAMMA = 0.9                 
